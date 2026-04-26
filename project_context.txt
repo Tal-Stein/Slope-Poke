@@ -1,0 +1,214 @@
+Perfect — I now have a complete picture. Let me put together the full plan.
+
+---
+
+# Prototyping Setup — Execution Plan
+
+## What We're Building
+
+A **Unity-based simulation environment** with a live GUI viewport, a **Python CV algorithm runtime** that receives real-time camera streams, a **virtual camera system** supporting single/multi/PTZ configurations with full parameter control, and a **coverage/overlap map engine** for multi-camera meshing analysis. The whole thing is shared across a small team via Git.
+
+---
+
+## Stack Decisions
+
+| Layer | Tool | Why |
+|---|---|---|
+| 3D Scene & Rendering | **Unity (LTS)** | Lightweight, great GUI, free for teams, scriptable in C# |
+| Camera Parameter Simulation | **Unity Perception package** | Built-in lens distortion, noise, labeling |
+| Frame Transport | **Shared Memory (mmap)** | Zero-copy, lowest latency for real-time streaming on a single machine |
+| CV Algorithm Runtime | **Python + OpenCV + NumPy** | Lingua franca for CV prototyping |
+| GPU Rendering | **Unity HDRP** | Leverages your NVIDIA GPU for realistic lighting |
+| Coverage Maps | **Python (frustum math) + Unity (raycasting)** | Clean separation: simulation computes, Python visualizes |
+| Team Sharing | **Git + Git LFS + conda env** | Unity assets + Python reproducibility |
+
+---
+
+## Phase 1 — Project Foundation
+
+**Goal:** Get every tool installed and the team able to clone and run a blank scene.
+
+1. Install **Unity Hub** → install Unity **LTS** (currently 2022.3 LTS). Select the **HDRP** template when creating the project.
+2. Add packages via Unity Package Manager:
+   - `com.unity.perception` (Unity Perception)
+   - `com.unity.cinemachine` (for PTZ camera rigs)
+   - `com.unity.mathematics`
+3. Create a **Python 3.10 conda environment**:
+   - Core deps: `opencv-python`, `numpy`, `pyzmq`, `mmap` (stdlib), `matplotlib`, `scipy`
+   - Pin versions in `environment.yml`
+4. Initialize a **Git repo** with Git LFS tracking for Unity asset types (`.fbx`, `.png`, `.mat`, `.asset`).
+5. Write a one-command setup script (`setup.sh` / `setup.bat`) that clones, installs Python env, and opens Unity project. Every team member should be able to onboard in under 10 minutes.
+
+---
+
+## Phase 2 — Scene Construction
+
+**Goal:** A configurable 3D world with moving content that serves as a realistic test bed.
+
+1. Build a **base scene** in Unity with configurable geometry — start with an indoor environment (warehouse/room) using Unity's ProBuilder for quick layout editing without external assets.
+2. Add a **scene config JSON schema** (`scene_config.json`) that controls: room dimensions, wall/floor materials, number of objects, lighting type (directional/point/area), and time-of-day (for outdoor scenes later).
+3. Create a **MovingObject prefab system**: objects that follow configurable paths (waypoints or procedural patrol) with adjustable speed. This drives the "dynamic scene content" requirement.
+4. Set up **HDRP lighting** with a Global Volume for realistic exposure, allowing you to simulate different lighting conditions per experiment run.
+5. Create a **SceneManager C# script** that reads `scene_config.json` at runtime and instantiates the scene accordingly — so switching test environments is a config change, not a Unity Editor change.
+
+---
+
+## Phase 3 — Virtual Camera System
+
+**Goal:** A fully programmable camera rig supporting all configurations and parameters.
+
+### 3a — Camera Model
+
+Create a `VirtualCamera` C# class wrapping Unity's `Camera` component, exposing:
+
+- **Intrinsics:** focal length (mm), sensor size, FOV (H/V/diagonal), principal point offset
+- **Lens distortion:** Brown-Conrady model coefficients (k1, k2, k3, p1, p2) via Unity Perception's lens distortion component
+- **Noise simulation:** Gaussian noise (mean, sigma), salt-and-pepper, fixed pattern noise
+- **Resolution:** arbitrary width × height
+- **Frame rate:** target FPS with delta-time locking
+- **Motion blur:** shutter angle (0–360°) via HDRP post-processing
+- **Depth of field:** aperture (f-stop), focus distance
+- **Exposure:** EV compensation, auto-exposure simulation
+
+All parameters serializable to/from a `camera_config.json` per camera instance.
+
+### 3b — Camera Rig Types
+
+Build three rig prefabs:
+
+- **MonoCameraRig** — single camera, free placement
+- **MultiCameraRig** — N cameras as children of a parent transform, each independently configured. Supports stereo (N=2) as a special case with baseline + vergence controls.
+- **PTZCameraRig** — uses Cinemachine's pan/tilt/zoom API. Exposes pan range, tilt range, zoom range, and angular velocity. Can be driven programmatically or via UI sliders.
+
+### 3c — Camera Manager UI
+
+Build a Unity Editor **custom Inspector panel** (or a runtime **in-scene UI canvas**) that lets any team member:
+- Add/remove cameras in the scene
+- Select a rig type
+- Tweak all parameters via sliders/fields live
+- Save/load named camera presets
+
+---
+
+## Phase 4 — Real-Time Frame Streaming Pipeline
+
+**Goal:** Unity renders frames → Python receives them in real-time with minimal latency.
+
+### Architecture
+
+```
+Unity (C#)                          Python
+┌─────────────────────┐             ┌──────────────────────────┐
+│  Camera A render    │──┐          │  SimulatorClient          │
+│  Camera B render    │──┤  mmap /  │  .get_frame(camera_id)   │
+│  Camera C render    │──┘  shared  │  .get_metadata()         │
+│  PTZ camera render  │──► memory ──►  .stream_to_algo(algo)   │
+│  Metadata writer    │             │                          │
+└─────────────────────┘             └──────────────────────────┘
+```
+
+### Implementation Steps
+
+1. In Unity: write a `FrameStreamer` C# component that, each frame, reads `RenderTexture` pixels from each active camera and writes them into a **named shared memory block** (one per camera), followed by a small metadata block: `{ camera_id, timestamp, frame_index, intrinsics, extrinsics }`.
+2. Use a **ring buffer** (2–3 frame slots per camera) in shared memory to decouple Unity's render loop from Python's read loop.
+3. In Python: write a `SimulatorClient` class using Python's `mmap` + `multiprocessing.shared_memory` to read frames by camera ID. Expose a simple API:
+   ```python
+   client = SimulatorClient()
+   frame, meta = client.get_frame("camera_A")  # numpy array, dict
+   ```
+4. Add a **watchdog** on both sides — if Unity stops writing (crash/pause), Python raises a clean `SimulatorDisconnected` exception rather than hanging.
+5. Benchmark end-to-end latency target: **< 5ms** frame transport overhead at 1080p, achievable with shared memory on a single machine.
+
+---
+
+## Phase 5 — Coverage & Overlap Map Engine
+
+**Goal:** Given N camera positions/orientations/FOVs, compute and visualize which regions of the scene each camera can see, and where cameras overlap.
+
+### 5a — Frustum Raycasting (Unity side)
+
+1. For each camera, cast a dense grid of rays from the camera origin through the image plane into the scene using Unity's `Physics.Raycast`.
+2. Record the **hit point** (world position) and **which camera** caused each hit.
+3. Aggregate hits into a **coverage grid** — a 2D top-down discretized map of the scene floor.
+4. Export the grid as a float32 numpy array per camera over shared memory (or a UDP packet for lower-frequency updates).
+
+### 5b — Overlap Map Computation (Python side)
+
+1. Receive per-camera coverage grids.
+2. Stack them and compute **overlap count per cell**: `overlap_map = sum(grids > 0, axis=0)`.
+3. Render as a **heatmap overlay** using matplotlib (0 = uncovered, 1 = single camera, 2+ = overlap zones).
+4. Expose a `CoverageAnalyzer` class with methods:
+   - `.compute_overlap_map()` → numpy heatmap
+   - `.coverage_percentage(camera_id)` → float
+   - `.blind_spots()` → list of uncovered regions
+   - `.export_map(path)` → saves PNG
+
+### 5c — Live Visualization
+
+- In Unity: draw camera frustums as Gizmos in the scene view (colored per camera).
+- In Python: open a matplotlib window updated at ~1 Hz showing the top-down overlap heatmap alongside the live camera feeds.
+
+---
+
+## Phase 6 — CV Algorithm Integration Layer
+
+**Goal:** Make it trivial to plug any CV algorithm into the streaming pipeline.
+
+1. Define a Python **`BaseAlgorithm` abstract class**:
+   ```python
+   class BaseAlgorithm:
+       def process(self, frame: np.ndarray, meta: dict) -> dict:
+           raise NotImplementedError
+   ```
+2. Build a **`PipelineRunner`** that:
+   - Subscribes to one or more camera streams
+   - Calls `algorithm.process(frame, meta)` per frame
+   - Collects and timestamps results
+   - Optionally overlays results back onto a display window
+3. Ship **two reference implementations** to validate the stack end-to-end:
+   - A simple **frame difference detector** (confirms streaming works)
+   - An **OpenCV background subtractor** (MOG2) for moving object detection
+
+---
+
+## Phase 7 — Team Setup & Reproducibility
+
+**Goal:** Any team member can clone and be running in one command.
+
+1. **Repository structure:**
+   ```
+   /unity-project/       ← Unity scene, C# scripts, prefabs
+   /python/
+     simulator_client/   ← shared memory client, coverage analyzer
+     algorithms/         ← BaseAlgorithm + reference impls
+     tools/              ← visualization, export utilities
+   /configs/
+     scenes/             ← scene_config.json examples
+     cameras/            ← camera preset JSONs
+   environment.yml       ← conda spec
+   setup.sh / setup.bat
+   README.md
+   ```
+2. **Config-driven experiments:** every experiment run is defined by a pair of `scene_config.json` + `camera_config.json`. Results (coverage maps, algorithm outputs) are saved to a timestamped `/runs/YYYY-MM-DD_HH-MM/` folder.
+3. **Unity Play Mode shortcut:** `F5` starts a run, `F6` pauses, `F7` exports current coverage map — all hooked to keyboard shortcuts in the Editor for fast iteration.
+4. **Team onboarding doc:** a single `README.md` with install steps, a "run your first experiment in 5 minutes" walkthrough, and a description of the JSON config schemas.
+
+---
+
+## Milestone Sequence
+
+| Milestone | Deliverable | Est. Effort |
+|---|---|---|
+| M1 | Blank Unity scene streams one camera to Python, frame visible | 1–2 days |
+| M2 | All camera parameters exposed and tunable in UI | 2–3 days |
+| M3 | Multi-camera + PTZ rigs working, all streams accessible in Python | 2–3 days |
+| M4 | Moving objects in scene, dynamic scene config loading | 1–2 days |
+| M5 | Coverage/overlap maps computing and visualizing live | 2–3 days |
+| M6 | `BaseAlgorithm` pipeline + 2 reference implementations | 1–2 days |
+| M7 | Git repo, team setup scripts, config system, README | 1 day |
+
+**Total estimated build time (solo or pair): ~2–3 focused weeks.**
+
+---
+
+Want to start executing? I'd suggest we tackle **M1 first** — I can generate the Unity C# streaming code and Python client together so you can validate the pipeline end-to-end before building anything else on top of it.
