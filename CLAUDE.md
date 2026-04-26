@@ -24,7 +24,7 @@ Load-bearing decisions. Do not drift without an explicit conversation with the u
 
 ### Stack
 - **Unity 6 LTS** (HDRP) — current LTS as of late 2024.
-- **Python 3.10** — env tooling TBD (see Open Questions).
+- **Python 3.10** managed by **uv** with `pyproject.toml` + `uv.lock`. Fast (seconds) reproducible onboarding.
 - **Windows-first** — driven by Spout choice. Linux/macOS are not targets.
 
 ### Frame transport (Unity → Python)
@@ -33,6 +33,10 @@ Load-bearing decisions. Do not drift without an explicit conversation with the u
 
 ### Control channel (Python → Unity)
 - **ZMQ** (REQ/REP or PUB/SUB) for PTZ commands and any other Python-driven Unity actions. Frames out via Spout, commands in via ZMQ — clean separation.
+
+### Camera rigs
+- **Mono** and **Multi** rigs follow the original plan.
+- **PTZ** uses a custom `PTZController` MonoBehaviour exposing pan / tilt / zoom directly to the ZMQ command channel — **not Cinemachine**. Closed-loop control needs predictable step responses, not cinematic blending/damping.
 
 ### Ground-truth pipeline (per frame, alongside RGB)
 - **Per-camera calibration** in OpenCV format: 3×3 camera matrix + distortion coefficients + 4×4 world pose. Exported in the metadata stream.
@@ -51,6 +55,10 @@ Load-bearing decisions. Do not drift without an explicit conversation with the u
 - Unity computes per-camera coverage via dense raycasting; recomputes only on camera movement events (PTZ tilt/pan/zoom or pose change), not on a polling timer. For static rigs this is a one-shot computation.
 - Python `CoverageAnalyzer` consumes per-camera grids and produces overlap heatmaps, blind-spot reports, coverage percentages.
 
+### Determinism & reproducibility
+- Sim runs with a **fixed RNG seed** and **fixed timestep** (`Time.fixedDeltaTime` locked, sim time not coupled to wall-clock). Both live in `scene_config.json`.
+- **Record-and-replay** is built in from day one. Each run writes a `recording.json` to its `runs/YYYY-MM-DD_HH-MM/` folder containing: scene init state, all PTZ commands with timestamps, object trajectories (or the seed-derived events that produce them). A replay command rehydrates the run deterministically for bug repros and apples-to-apples algorithm comparisons.
+
 ## Repository Layout (planned)
 
 ```
@@ -63,7 +71,9 @@ configs/
   scenes/             scene_config.json examples
   cameras/            camera preset JSONs
 runs/                 per-experiment output (gitignored)
-setup.sh / setup.bat  one-command setup
+pyproject.toml        Python deps (uv-managed)
+uv.lock               pinned dependency lock
+setup.sh / setup.bat  one-command setup (uv sync + Unity Hub launch)
 ```
 
 ## Conventions
@@ -74,12 +84,7 @@ setup.sh / setup.bat  one-command setup
 
 ## Open Questions
 
-Still unresolved — confirm with the user before committing to a direction:
-
-- **PTZ implementation:** Cinemachine 3.x vs a small custom `PTZController`. With PTZ as a closed-loop target, Cinemachine's blending/damping likely fights programmatic control.
-- **Python env tooling:** conda + `environment.yml` (per original plan) vs `uv` + `pyproject.toml` (much faster onboarding).
-- **Determinism / record-and-replay:** lock sim to fixed RNG seed + fixed timestep, and add a record/replay mechanism for reproducible bug repros?
-- **Camera-count target / dev hardware:** typical N cameras per experiment, and dev GPU spec — drives perf budgets.
+- **Camera-count target / dev hardware:** typical N cameras per experiment, and dev GPU spec. Drives perf budgets and whether to cap render resolution. Not architecturally blocking — ask when starting M2.
 
 ## Reference
 
