@@ -1,0 +1,45 @@
+{
+  "$schema": "../schema/cameras.schema.json",
+  "cameras": [
+    {
+      "id": "cameraA",
+      "rig": "mono",
+      "position": [0.0, 1.6, -4.0],
+      "rotation_euler_deg": [10.0, 0.0, 0.0],
+      "intrinsics": {
+        "focal_length_mm": 35.0,
+        "sensor_size_mm": [36.0, 24.0],
+        "principal_point_px": [0.0, 0.0],
+        "render_width": 1920,
+        "render_height": 1080
+      },
+      "distortion": { "k1": 0.0, "k2": 0.0, "p1": 0.0, "p2": 0.0, "k3": 0.0 },
+      "noise": { "gaussian_sigma": 0.0, "salt_pepper_rate": 0.0 },
+      "optics": {
+        "shutter_angle_deg": 180.0,
+        "aperture_fstop": 5.6,
+        "focus_distance_m": 5.0,
+        "exposure_compensation_ev": 0.0
+      }
+    },
+    {
+      "id": "ptzA",
+      "rig": "ptz",
+      "position": [0.0, 2.5, 0.0],
+      "ptz": {
+        "pan_range_deg": [-180.0, 180.0],
+        "tilt_range_deg": [-90.0, 30.0],
+        "zoom_range_mm": [15.0, 200.0],
+        "max_pan_rate_deg_s": 120.0,
+        "max_tilt_rate_deg_s": 90.0
+      },
+      "intrinsics": {
+        "focal_length_mm": 50.0,
+        "sensor_size_mm": [36.0, 24.0],
+        "principal_point_px": [0.0, 0.0],
+        "render_width": 1920,
+        "render_height": 1080
+      }
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CamerasConfig",
+  "type": "object",
+  "required": ["cameras"],
+  "properties": {
+    "cameras": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "rig"],
+        "properties": {
+          "id":   { "type": "string" },
+          "rig":  { "type": "string", "enum": ["mono", "multi", "ptz"] },
+          "position":           { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+          "rotation_euler_deg": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+          "intrinsics": {
+            "type": "object",
+            "properties": {
+              "focal_length_mm":    { "type": "number" },
+              "sensor_size_mm":     { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+              "principal_point_px": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+              "render_width":       { "type": "integer" },
+              "render_height":      { "type": "integer" }
+            }
+          },
+          "distortion": { "type": "object" },
+          "noise":      { "type": "object" },
+          "optics":     { "type": "object" },
+          "ptz":        { "type": "object" }
+        }
+      }
+    }
+  }
+}

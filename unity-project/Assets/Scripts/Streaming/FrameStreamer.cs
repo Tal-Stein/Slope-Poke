@@ -1,0 +1,48 @@
+using Klak.Spout;
+using SlopePoke.Cameras;
+using UnityEngine;
+
+namespace SlopePoke.Streaming
+{
+    /// <summary>
+    /// Per-camera Spout sender. Sits on the same GameObject as a VirtualCamera and
+    /// pushes that camera's color RT into a Spout sender named "<cameraId>_rgb".
+    /// </summary>
+    [RequireComponent(typeof(VirtualCamera))]
+    public class FrameStreamer : MonoBehaviour
+    {
+        VirtualCamera _vcam;
+        SpoutSender _sender;
+        RenderTexture _rt;
+
+        void Awake()
+        {
+            _vcam = GetComponent<VirtualCamera>();
+        }
+
+        void OnEnable()
+        {
+            _rt = new RenderTexture(_vcam.renderWidth, _vcam.renderHeight, 24,
+                                    RenderTextureFormat.ARGB32);
+            _rt.Create();
+            _vcam.UnityCamera.targetTexture = _rt;
+
+            _sender = gameObject.AddComponent<SpoutSender>();
+            _sender.spoutName = $"{_vcam.cameraId}_rgb";
+            _sender.captureMethod = CaptureMethod.Texture;
+            _sender.sourceTexture = _rt;
+        }
+
+        void OnDisable()
+        {
+            if (_sender != null) Destroy(_sender);
+            if (_rt != null)
+            {
+                _vcam.UnityCamera.targetTexture = null;
+                _rt.Release();
+                Destroy(_rt);
+                _rt = null;
+            }
+        }
+    }
+}

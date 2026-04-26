@@ -1,0 +1,38 @@
+[project]
+name = "slope-poke"
+version = "0.1.0"
+description = "Unity + Python prototyping environment for computer-vision algorithm development."
+readme = "README.md"
+requires-python = ">=3.10,<3.11"
+dependencies = [
+    "numpy>=1.26,<3",
+    "opencv-python>=4.10",
+    "pyzmq>=26",
+    "SpoutGL>=0.0.6",
+    "matplotlib>=3.8",
+    "pydantic>=2.6",
+    "msgpack>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+slope-poke = "slope_poke.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["python/slope_poke"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

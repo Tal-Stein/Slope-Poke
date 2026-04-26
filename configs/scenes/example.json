@@ -1,0 +1,15 @@
+{
+  "$schema": "../schema/scene.schema.json",
+  "seed": 42,
+  "fixedDeltaTime": 0.01666667,
+  "roomMaterial": "default",
+  "roomDimensions": { "x": 10.0, "y": 3.0, "z": 10.0 },
+  "lighting": "directional",
+  "objects": [
+    {
+      "prefab": "Walker",
+      "path": [[-3, 0, -3], [3, 0, -3], [3, 0, 3], [-3, 0, 3]],
+      "speed": 1.2
+    }
+  ]
+}
