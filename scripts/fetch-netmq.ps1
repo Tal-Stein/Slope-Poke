@@ -7,7 +7,14 @@ $tmp = Join-Path $env:TEMP "slope-poke-nuget"
 if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force }
 New-Item -ItemType Directory -Path $tmp | Out-Null
 
-foreach ($pkg in @("NetMQ", "AsyncIO")) {
+$pkgs = @(
+    @{ Name = "NetMQ";    Dll = "NetMQ.dll"   },
+    @{ Name = "AsyncIO";  Dll = "AsyncIO.dll" },
+    @{ Name = "NaCl.Net"; Dll = "NaCl.dll"    }
+)
+foreach ($entry in $pkgs) {
+    $pkg = $entry.Name
+    $dllName = $entry.Dll
     $zip = Join-Path $tmp "$pkg.zip"
     Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/$pkg" -OutFile $zip
     $extract = Join-Path $tmp $pkg
@@ -20,7 +27,7 @@ foreach ($pkg in @("NetMQ", "AsyncIO")) {
     if ($null -eq $picked) {
         $picked = Get-ChildItem $libRoot -Directory | Select-Object -First 1
     }
-    $dll = Get-ChildItem $picked.FullName -Filter "$pkg.dll" -File | Select-Object -First 1
+    $dll = Get-ChildItem $picked.FullName -Filter $dllName -File | Select-Object -First 1
     Copy-Item -Path $dll.FullName -Destination $plugins -Force
     # Write minimal .dll.meta so Unity imports the plugin even if the editor is
     # in safe mode (where new asset import is blocked until compilation succeeds).

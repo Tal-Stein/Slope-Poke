@@ -10,7 +10,8 @@
     "overrideReferences": true,
     "precompiledReferences": [
         "NetMQ.dll",
-        "AsyncIO.dll"
+        "AsyncIO.dll",
+        "NaCl.dll"
     ],
     "autoReferenced": true,
     "defineConstraints": [],
