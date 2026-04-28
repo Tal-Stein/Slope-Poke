@@ -18,8 +18,8 @@
 *.pdb
 *.opendb
 
-# Plugins/ DLLs are fetched per-developer via NuGetForUnity.
-Plugins/*.dll
-Plugins/*.dll.meta
-Plugins/*.pdb
-Plugins/*.xml
+# Plugins/ DLLs are fetched per-developer via NuGetForUnity / fetch-netmq.ps1.
+Assets/Plugins/*.dll
+Assets/Plugins/*.dll.meta
+Assets/Plugins/*.pdb
+Assets/Plugins/*.xml

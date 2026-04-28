@@ -2,7 +2,7 @@
 # Run from repo root: powershell -ExecutionPolicy Bypass -File scripts/fetch-netmq.ps1
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$plugins = Join-Path $root "unity-project\Plugins"
+$plugins = Join-Path $root "unity-project\Assets\Plugins"
 $tmp = Join-Path $env:TEMP "slope-poke-nuget"
 if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force }
 New-Item -ItemType Directory -Path $tmp | Out-Null
