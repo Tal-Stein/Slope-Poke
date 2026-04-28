@@ -22,6 +22,42 @@ foreach ($pkg in @("NetMQ", "AsyncIO")) {
     }
     $dll = Get-ChildItem $picked.FullName -Filter "$pkg.dll" -File | Select-Object -First 1
     Copy-Item -Path $dll.FullName -Destination $plugins -Force
+    # Write minimal .dll.meta so Unity imports the plugin even if the editor is
+    # in safe mode (where new asset import is blocked until compilation succeeds).
+    $metaPath = Join-Path $plugins ($dll.Name + ".meta")
+    if (-not (Test-Path $metaPath)) {
+        $guid = ([guid]::NewGuid().ToString("N"))
+        $meta = @"
+fileFormatVersion: 2
+guid: $guid
+PluginImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  iconMap: {}
+  executionOrder: {}
+  defineConstraints: []
+  isPreloaded: 0
+  isOverridable: 0
+  isExplicitlyReferenced: 0
+  validateReferences: 1
+  platformData:
+  - first:
+      Any:
+    second:
+      enabled: 1
+      settings: {}
+  - first:
+      Editor: Editor
+    second:
+      enabled: 0
+      settings:
+        DefaultValueInitialized: true
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+        Set-Content -Path $metaPath -Value $meta -Encoding UTF8
+    }
     Write-Output ("[$pkg] copied " + $dll.Name + " from " + $picked.Name)
 }
 Write-Output "---"
