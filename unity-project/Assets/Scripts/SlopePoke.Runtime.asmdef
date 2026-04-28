@@ -2,7 +2,7 @@
     "name": "SlopePoke.Runtime",
     "rootNamespace": "SlopePoke",
     "references": [
-        "Klak.Spout"
+        "Klak.Spout.Runtime"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -10,8 +10,7 @@
     "overrideReferences": true,
     "precompiledReferences": [
         "NetMQ.dll",
-        "AsyncIO.dll",
-        "NaCl.dll"
+        "AsyncIO.dll"
     ],
     "autoReferenced": true,
     "defineConstraints": [],

@@ -9,6 +9,7 @@
 [Mm]emoryCaptures/
 *.csproj
 *.sln
+*.slnx
 *.unityproj
 *.user
 *.userprefs
