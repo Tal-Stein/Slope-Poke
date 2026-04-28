@@ -93,7 +93,6 @@ namespace SlopePoke.Cameras
 
         void RunZmq()
         {
-            ForceDotNet.Force();
             AsyncIO.ForceDotNet.Force();
             using var rep = new ResponseSocket();
             rep.Bind(bindEndpoint);

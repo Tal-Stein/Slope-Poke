@@ -2,7 +2,7 @@
     "name": "SlopePoke.Runtime",
     "rootNamespace": "SlopePoke",
     "references": [
-        "GUID:0000000000000000e000000000000000"
+        "Klak.Spout"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

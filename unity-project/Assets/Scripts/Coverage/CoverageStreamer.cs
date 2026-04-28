@@ -22,7 +22,6 @@ namespace SlopePoke.Coverage
 
         void OnEnable()
         {
-            ForceDotNet.Force();
             AsyncIO.ForceDotNet.Force();
             _pub = new PublisherSocket();
             _pub.Options.SendHighWatermark = 8;
