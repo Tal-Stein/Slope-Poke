@@ -22,6 +22,8 @@ namespace SlopePoke.Coverage
         public float maxRayDistance = 100f;
 
         public float[,] Grid { get; private set; }
+        /// <summary>Increments every time Recompute() runs — pollers can detect updates.</summary>
+        public int Generation { get; private set; }
 
         VirtualCamera _vcam;
         Camera _cam;
@@ -68,6 +70,7 @@ namespace SlopePoke.Coverage
                     Grid[gy, gx] = 1f;
                 }
             }
+            Generation++;
         }
     }
 }
