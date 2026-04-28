@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using NetMQ;
 using NetMQ.Sockets;
 using SlopePoke.Cameras;
+using SlopePoke.Scene;
 using UnityEngine;
 
 namespace SlopePoke.Streaming
@@ -17,6 +18,7 @@ namespace SlopePoke.Streaming
 
         PublisherSocket _pub;
         VirtualCamera[] _cams;
+        AnnotatedObject[] _annotated;
 
         void OnEnable()
         {
@@ -26,7 +28,8 @@ namespace SlopePoke.Streaming
             _pub.Options.SendHighWatermark = 32;
             _pub.Bind(bindEndpoint);
             _cams = FindObjectsByType<VirtualCamera>(FindObjectsSortMode.None);
-            Debug.Log($"[MetadataPublisher] bound {bindEndpoint}, {_cams.Length} cameras");
+            _annotated = FindObjectsByType<AnnotatedObject>(FindObjectsSortMode.None);
+            Debug.Log($"[MetadataPublisher] bound {bindEndpoint}, {_cams.Length} cameras, {_annotated.Length} annotated objects");
         }
 
         void OnDisable()
@@ -40,17 +43,26 @@ namespace SlopePoke.Streaming
         {
             if (_pub == null) return;
             float t = Time.time;
+            // Build the objects list once per tick — same for every camera in the frame.
+            var objects = new List<object>(_annotated.Length);
+            foreach (var obj in _annotated)
+            {
+                if (obj == null || !obj.isActiveAndEnabled) continue;
+                objects.Add(obj.ToMsgPackDict());
+            }
             foreach (var cam in _cams)
             {
                 var intr = cam.GetIntrinsicsPx();
                 var pose = cam.GetWorldPoseRowMajor();
-                var payload = BuildPayload(cam.cameraId, frameIndex, t, intr, pose);
+                var payload = BuildPayload(cam.cameraId, frameIndex, t, intr, pose, objects);
                 _pub.SendMoreFrame(cam.cameraId).SendFrame(payload);
             }
             frameIndex++;
         }
 
-        static byte[] BuildPayload(string id, int frame, float t, CameraIntrinsics intr, float[] pose)
+        static byte[] BuildPayload(
+            string id, int frame, float t, CameraIntrinsics intr, float[] pose,
+            List<object> objects)
         {
             // Hand-rolled msgpack map for "camera_id, frame_index, timestamp,
             // sender, intrinsics{...}, extrinsics{matrix:4x4}, objects:[]".
@@ -81,7 +93,7 @@ namespace SlopePoke.Streaming
                         new[] { pose[12], pose[13], pose[14], pose[15] },
                     },
                 },
-                ["objects"] = System.Array.Empty<object>(),
+                ["objects"] = objects,
             };
             return MsgPackEncoder.Encode(doc);
         }
