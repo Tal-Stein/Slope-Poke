@@ -33,15 +33,37 @@ namespace SlopePoke.Cameras
         public float focusDistance = 5f;
         public float exposureCompensationEv;
 
+        [Header("Render pipeline")]
+        [Tooltip("Target framerate used to convert shutterAngleDeg into a physical shutterSpeed " +
+                 "(seconds). 60 fps is a sensible default; raise it for high-fps scenarios.")]
+        public float targetFramerate = 60f;
+
         Camera _cam;
         public Camera UnityCamera => _cam ??= GetComponent<Camera>();
 
         void OnValidate()
         {
+            ApplyPhysicalProperties();
+        }
+
+        void OnEnable()
+        {
+            ApplyPhysicalProperties();
+        }
+
+        /// <summary>Push aperture / focus / shutter into the underlying Camera. HDRP DoF in
+        /// PhysicalCamera mode and Motion Blur in PhysicalShutter mode read from these.</summary>
+        public void ApplyPhysicalProperties()
+        {
             var c = UnityCamera;
             c.usePhysicalProperties = true;
             c.focalLength = focalLengthMm;
             c.sensorSize = sensorSizeMm;
+            c.aperture = Mathf.Max(0.0001f, aperture);
+            c.focusDistance = Mathf.Max(0.01f, focusDistance);
+            float fps = Mathf.Max(1f, targetFramerate);
+            float openFraction = Mathf.Clamp01(shutterAngleDeg / 360f);
+            c.shutterSpeed = openFraction / fps;
         }
 
         public CameraIntrinsics GetIntrinsicsPx()
