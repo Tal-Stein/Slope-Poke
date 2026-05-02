@@ -6,8 +6,10 @@ Run while Unity is in Play mode:
 
 from __future__ import annotations
 
+import json
 import time
 
+import msgpack
 import zmq
 
 from slope_poke.simulator_client.spout_receiver import SpoutReceiver
@@ -24,6 +26,16 @@ while time.monotonic() < deadline:
     try:
         topic, body = sub.recv_multipart()
         print(f"  got metadata topic={topic!r} bytes={len(body)}")
+        decoded = msgpack.unpackb(body, raw=False)
+        # Trim numeric arrays so the dump stays readable.
+        if isinstance(decoded, dict):
+            for key in ("intrinsics", "extrinsics"):
+                if key in decoded:
+                    print(f"  {key}: {decoded[key]}")
+            objs = decoded.get("objects", [])
+            print(f"  objects ({len(objs)}):")
+            for o in objs:
+                print(f"    - id={o.get('object_id')} class={o.get('class_name')!r}")
         got_meta = True
         break
     except zmq.error.Again:
@@ -33,19 +45,27 @@ if not got_meta:
 sub.close()
 
 print()
-print("--- 2. Spout sender 'cameraA_rgb' ---")
-with SpoutReceiver("cameraA_rgb") as rx:
-    deadline = time.monotonic() + 3.0
+print("--- 2. Spout sender (first '<id>_rgb' discovered) ---")
+from slope_poke.tools import discover_cameras
+cam_ids = discover_cameras()
+if not cam_ids:
+    print("  NO Spout senders discovered — nothing to test.")
     got_frame = False
-    while time.monotonic() < deadline:
-        f = rx.receive()
-        if f is not None:
-            print(f"  got frame {f.width}x{f.height}, {f.pixels.dtype}")
-            got_frame = True
-            break
-        time.sleep(0.01)
-    if not got_frame:
-        print("  NO FRAME RECEIVED in 3s — SpoutReceiver isn't getting pixels.")
+else:
+    target = cam_ids[0] + "_rgb"
+    print(f"  testing sender {target!r} (of {len(cam_ids)} discovered: {cam_ids})")
+    with SpoutReceiver(target) as rx:
+        deadline = time.monotonic() + 3.0
+        got_frame = False
+        while time.monotonic() < deadline:
+            f = rx.receive()
+            if f is not None:
+                print(f"  got frame {f.width}x{f.height}, {f.pixels.dtype}")
+                got_frame = True
+                break
+            time.sleep(0.01)
+        if not got_frame:
+            print("  NO FRAME RECEIVED in 3s — SpoutReceiver isn't getting pixels.")
 
 print()
 print("Summary:")
