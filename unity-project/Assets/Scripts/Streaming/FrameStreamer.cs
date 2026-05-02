@@ -1,6 +1,7 @@
 using Klak.Spout;
 using SlopePoke.Cameras;
 using UnityEngine;
+using UnityEngine.Rendering.HighDefinition;
 
 namespace SlopePoke.Streaming
 {
@@ -22,10 +23,20 @@ namespace SlopePoke.Streaming
 
         void OnEnable()
         {
+            // HDRP renders to the targetTexture via the same pipeline it uses for
+            // the screen, but only if the camera has HDAdditionalCameraData with a
+            // sane clear-color mode. Without this, the RT stays black even when
+            // the scene is visibly lit on a screen-rendering camera.
+            var cam = _vcam.UnityCamera;
+            var hdData = cam.GetComponent<HDAdditionalCameraData>()
+                         ?? cam.gameObject.AddComponent<HDAdditionalCameraData>();
+            hdData.clearColorMode = HDAdditionalCameraData.ClearColorMode.Sky;
+            hdData.volumeLayerMask = ~0;  // honor every Volume in the scene
+
             _rt = new RenderTexture(_vcam.renderWidth, _vcam.renderHeight, 24,
                                     RenderTextureFormat.ARGB32);
             _rt.Create();
-            _vcam.UnityCamera.targetTexture = _rt;
+            cam.targetTexture = _rt;
 
             _sender = gameObject.AddComponent<SpoutSender>();
             _sender.spoutName = $"{_vcam.cameraId}_rgb";
