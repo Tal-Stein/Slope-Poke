@@ -26,8 +26,15 @@ namespace SlopePoke.Coverage
             _pub = new PublisherSocket();
             _pub.Options.SendHighWatermark = 8;
             _pub.Bind(bindEndpoint);
-            _rays = FindObjectsByType<CoverageRaycaster>(FindObjectsSortMode.None);
+            _rays = System.Array.Empty<CoverageRaycaster>();
             _lastGen = new Dictionary<CoverageRaycaster, int>();
+        }
+
+        void Start()
+        {
+            // Defer discovery to Start so we see CoverageRaycasters added by
+            // CamerasLoader's Awake; OnEnable races with those spawns.
+            _rays = FindObjectsByType<CoverageRaycaster>(FindObjectsSortMode.None);
             foreach (var r in _rays) _lastGen[r] = -1;
             Debug.Log($"[CoverageStreamer] bound {bindEndpoint}, {_rays.Length} raycasters");
         }

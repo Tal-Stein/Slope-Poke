@@ -26,6 +26,15 @@ namespace SlopePoke.Streaming
             _pub = new PublisherSocket();
             _pub.Options.SendHighWatermark = 32;
             _pub.Bind(bindEndpoint);
+            _cams = System.Array.Empty<VirtualCamera>();
+            _annotated = System.Array.Empty<AnnotatedObject>();
+        }
+
+        void Start()
+        {
+            // Defer discovery to Start so we see GameObjects spawned by other
+            // components' Awake (e.g., CamerasLoader). OnEnable races with
+            // those spawns and can find zero matches.
             _cams = FindObjectsByType<VirtualCamera>(FindObjectsSortMode.None);
             _annotated = FindObjectsByType<AnnotatedObject>(FindObjectsSortMode.None);
             Debug.Log($"[MetadataPublisher] bound {bindEndpoint}, {_cams.Length} cameras, {_annotated.Length} annotated objects");
