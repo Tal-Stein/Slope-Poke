@@ -48,6 +48,8 @@ class TileViewer:
         snapshot_dir: Path | str = "runs",
         zmq_endpoint: str = "tcp://127.0.0.1:5555",
         per_camera_timeout: float = 0.05,
+        border_px: int = 2,
+        border_color: tuple[int, int, int] = (40, 40, 40),
     ):
         if not camera_ids:
             raise ValueError("TileViewer requires at least one camera_id.")
@@ -57,6 +59,8 @@ class TileViewer:
         self.snapshot_dir = Path(snapshot_dir)
         self.zmq_endpoint = zmq_endpoint
         self.per_camera_timeout = per_camera_timeout
+        self.border_px = max(0, border_px)
+        self.border_color = border_color
 
         # Per-camera latest (frame_bgr, meta) cache so the grid stays populated
         # even when one camera misses a frame on a particular tick.
@@ -69,7 +73,12 @@ class TileViewer:
         rows = math.ceil(len(self.camera_ids) / cols)
         window = "slope-poke view"
         cv2.namedWindow(window, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(window, self.tile_w * cols, self.tile_h * rows)
+        # Each tile gets `border_px` on every side, so total seam between tiles
+        # is 2*border_px (and the outer frame is border_px). Size the window for
+        # the bordered tiles.
+        outer_w = (self.tile_w + 2 * self.border_px) * cols
+        outer_h = (self.tile_h + 2 * self.border_px) * rows
+        cv2.resizeWindow(window, outer_w, outer_h)
         print(f"Opened tile viewer ({len(self.camera_ids)} cameras, {cols}×{rows} grid)."
               " Press 'q' to quit, 's' to snapshot.")
 
@@ -113,10 +122,10 @@ class TileViewer:
                                   interpolation=cv2.INTER_AREA)
                 cv2.putText(tile, cid, (8, 22),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 1, cv2.LINE_AA)
-            tiles.append(tile)
+            tiles.append(self._with_border(tile))
 
-        # Pad to a full grid with black tiles so np.concatenate doesn't choke.
-        blank = np.zeros((self.tile_h, self.tile_w, 3), dtype=np.uint8)
+        # Pad to a full grid with bordered black tiles so np.concatenate doesn't choke.
+        blank = self._with_border(np.zeros((self.tile_h, self.tile_w, 3), dtype=np.uint8))
         while len(tiles) < rows * cols:
             tiles.append(blank)
 
@@ -125,6 +134,15 @@ class TileViewer:
             for r in range(rows)
         ]
         return np.concatenate(rows_imgs, axis=0)
+
+    def _with_border(self, tile: np.ndarray) -> np.ndarray:
+        if self.border_px == 0:
+            return tile
+        return cv2.copyMakeBorder(
+            tile,
+            self.border_px, self.border_px, self.border_px, self.border_px,
+            cv2.BORDER_CONSTANT, value=self.border_color,
+        )
 
     @staticmethod
     def _draw_overlays(frame_bgr: np.ndarray, meta: FrameMeta) -> np.ndarray:
@@ -167,6 +185,8 @@ def run_viewer(
     tile_size: tuple[int, int] = (480, 270),
     draw_overlays: bool = True,
     zmq_endpoint: str = "tcp://127.0.0.1:5555",
+    border_px: int = 2,
+    border_color: tuple[int, int, int] = (40, 40, 40),
 ) -> int:
     """Top-level helper used by the CLI. Auto-discovers cameras when none given."""
     if not camera_ids:
@@ -185,5 +205,7 @@ def run_viewer(
         tile_size=tile_size,
         draw_overlays=draw_overlays,
         zmq_endpoint=zmq_endpoint,
+        border_px=border_px,
+        border_color=border_color,
     )
     return viewer.run()

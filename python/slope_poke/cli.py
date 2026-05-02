@@ -137,6 +137,7 @@ def cmd_view(args: argparse.Namespace) -> int:
         tile_size=args.tile,
         draw_overlays=not args.no_overlays,
         zmq_endpoint=args.zmq,
+        border_px=args.border,
     )
 
 
@@ -194,6 +195,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="Per-camera tile size, format WxH (default 480x270).")
     vw.add_argument("--no-overlays", action="store_true",
                     help="Disable bbox/label overlays from the metadata stream.")
+    vw.add_argument("--border", type=int, default=2,
+                    help="Pixel border around each tile (default 2; pass 0 to disable).")
     vw.add_argument("--zmq", default="tcp://127.0.0.1:5555",
                     help="Metadata channel endpoint.")
     vw.set_defaults(func=cmd_view)
