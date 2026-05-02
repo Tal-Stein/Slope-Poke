@@ -5,6 +5,7 @@ using SlopePoke.Cameras;
 using SlopePoke.Coverage;
 using SlopePoke.Streaming;
 using UnityEngine;
+using UnityEngine.Rendering.HighDefinition;
 
 namespace SlopePoke.Scene
 {
@@ -103,10 +104,28 @@ namespace SlopePoke.Scene
             var go = new GameObject(e.Id);
             ApplyTransform(go.transform, e);
             go.AddComponent<Camera>();
+            ConfigureHdrpCamera(go);
             var vcam = go.AddComponent<VirtualCamera>();
             ApplyVirtualCameraFields(vcam, e);
             go.AddComponent<FrameStreamer>();
             MaybeAddCoverage(go, vcam);
+        }
+
+        // Attach HDAdditionalCameraData immediately after the Camera so HDRP
+        // registers this camera in its render loop on the very next frame.
+        // Adding it later (e.g., from FrameStreamer.OnEnable) sometimes leaves
+        // the camera invisible to HDRP's per-frame render scheduler.
+        // Bright-pink test color: if you see pink tiles in slope-poke view,
+        // the camera IS rendering and we just need to fix sky/geometry. If
+        // they're still black, HDRP is still not running this camera.
+        static void ConfigureHdrpCamera(GameObject go)
+        {
+            var cam = go.GetComponent<Camera>();
+            var hdData = cam.GetComponent<HDAdditionalCameraData>()
+                         ?? cam.gameObject.AddComponent<HDAdditionalCameraData>();
+            hdData.clearColorMode = HDAdditionalCameraData.ClearColorMode.Color;
+            hdData.backgroundColorHDR = new Color(1f, 0f, 1f, 1f);  // diagnostic pink
+            hdData.volumeLayerMask = ~0;
         }
 
         void SpawnPtz(CameraConfigDto e)
@@ -127,6 +146,7 @@ namespace SlopePoke.Scene
             var cam = new GameObject($"{e.Id}_camera");
             cam.transform.SetParent(rig.transform, false);
             cam.AddComponent<Camera>();
+            ConfigureHdrpCamera(cam);
             var vcam = cam.AddComponent<VirtualCamera>();
             ApplyVirtualCameraFields(vcam, e);
             cam.AddComponent<FrameStreamer>();

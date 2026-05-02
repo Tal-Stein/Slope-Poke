@@ -1,7 +1,6 @@
 using Klak.Spout;
 using SlopePoke.Cameras;
 using UnityEngine;
-using UnityEngine.Rendering.HighDefinition;
 
 namespace SlopePoke.Streaming
 {
@@ -24,16 +23,13 @@ namespace SlopePoke.Streaming
         void OnEnable()
         {
             var cam = _vcam.UnityCamera;
-            var hdData = cam.GetComponent<HDAdditionalCameraData>()
-                         ?? cam.gameObject.AddComponent<HDAdditionalCameraData>();
-            hdData.clearColorMode = HDAdditionalCameraData.ClearColorMode.Sky;
-            hdData.volumeLayerMask = ~0;
+            // HDAdditionalCameraData configuration (clearColorMode, volume mask)
+            // is set up by CamerasLoader.ConfigureHdrpCamera before this runs.
 
             // DefaultHDR picks the project's HDR-precision format (typically
             // R11G11B10_UFloat or R16G16B16A16_SFloat). HDRP writes its
             // post-processed final color to this and KlakSpout downsamples to
-            // 8-bit RGBA at the Spout boundary — required for proper
-            // tonemapping/exposure to land in the captured pixels.
+            // 8-bit RGBA at the Spout boundary.
             _rt = new RenderTexture(_vcam.renderWidth, _vcam.renderHeight, 24,
                                     RenderTextureFormat.DefaultHDR);
             _rt.Create();
