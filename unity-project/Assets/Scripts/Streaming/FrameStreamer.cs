@@ -14,6 +14,7 @@ namespace SlopePoke.Streaming
     {
         VirtualCamera _vcam;
         SpoutSender _sender;
+        RenderTexture _rt;
 
         void Awake()
         {
@@ -22,27 +23,38 @@ namespace SlopePoke.Streaming
 
         void OnEnable()
         {
-            // KlakSpout's Camera capture method hooks into the SRP render-pipeline
-            // callbacks and grabs the camera's final output (post-tonemapping,
-            // post-exposure) for every render. Texture mode (writing through a
-            // managed RT) frequently produces black frames in HDRP because HDRP
-            // skips post-processing for non-screen cameras. Camera mode avoids
-            // that path entirely.
             var cam = _vcam.UnityCamera;
             var hdData = cam.GetComponent<HDAdditionalCameraData>()
                          ?? cam.gameObject.AddComponent<HDAdditionalCameraData>();
             hdData.clearColorMode = HDAdditionalCameraData.ClearColorMode.Sky;
             hdData.volumeLayerMask = ~0;
 
+            // DefaultHDR picks the project's HDR-precision format (typically
+            // R11G11B10_UFloat or R16G16B16A16_SFloat). HDRP writes its
+            // post-processed final color to this and KlakSpout downsamples to
+            // 8-bit RGBA at the Spout boundary — required for proper
+            // tonemapping/exposure to land in the captured pixels.
+            _rt = new RenderTexture(_vcam.renderWidth, _vcam.renderHeight, 24,
+                                    RenderTextureFormat.DefaultHDR);
+            _rt.Create();
+            cam.targetTexture = _rt;
+
             _sender = gameObject.AddComponent<SpoutSender>();
             _sender.spoutName = $"{_vcam.cameraId}_rgb";
-            _sender.captureMethod = CaptureMethod.Camera;
-            _sender.sourceCamera = cam;
+            _sender.captureMethod = CaptureMethod.Texture;
+            _sender.sourceTexture = _rt;
         }
 
         void OnDisable()
         {
             if (_sender != null) Destroy(_sender);
+            if (_rt != null)
+            {
+                _vcam.UnityCamera.targetTexture = null;
+                _rt.Release();
+                Destroy(_rt);
+                _rt = null;
+            }
         }
     }
 }
