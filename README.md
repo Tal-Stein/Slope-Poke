@@ -68,6 +68,27 @@ build a locked `.venv` from `pyproject.toml`.
 If `slope-poke list` returns no senders, KlakSpout isn't initialized yet — make
 sure the camera is enabled and the scene is in Play mode.
 
+## Visualization
+
+When Unity is in Play and senders are live:
+
+```cmd
+uv run slope-poke view                 # OpenCV tile viewer with bbox overlays
+uv run slope-poke view --no-overlays   # raw frames only
+uv run slope-poke layout --config configs/cameras/ring8.json --out layout.png --with-targets
+```
+
+In-editor preview: add a `Camera` GameObject to the scene **without**
+`VirtualCamera` / `FrameStreamer` — call it `PreviewCamera`. Unity's Game view
+auto-picks any camera with `targetTexture == null`, so it renders the scene
+without disturbing the Spout pipeline.
+
+External tools worth installing:
+
+- **SpoutSettings** (free, https://spout.zeal.co/) — system-tray utility with
+  thumbnails of every active Spout sender. Fastest "is anything coming out?" check.
+- **OBS Studio** + the `obs-spout2-plugin` — capture session video for review.
+
 ## Conventions
 
 - **Commits + push** at every meaningful checkpoint. Remote: `origin`

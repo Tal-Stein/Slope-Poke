@@ -6,6 +6,8 @@ Subcommands:
     ptz                Send a one-shot pan/tilt/zoom command to a Unity PTZController.
     coverage           Listen for coverage grids from Unity and dump a heatmap PNG.
     generate-config    Programmatically generate a cameras.json (ring/grid/random).
+    view               Live OpenCV tile viewer for all cameras with bbox overlays.
+    layout             Render a top-down rig layout plot from a cameras.json.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from .control import PTZClient, PTZCommand, PTZError
 from .coverage import CoverageReceiver
 from .simulator_client import SimulatorClient
 from .simulator_client.exceptions import FrameTimeout
+from .tools import plot_layout, run_viewer
 
 
 def cmd_smoke(args: argparse.Namespace) -> int:
@@ -127,6 +130,28 @@ def cmd_generate_config(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_view(args: argparse.Namespace) -> int:
+    cam_ids = [c.strip() for c in args.cameras.split(",") if c.strip()] if args.cameras else None
+    return run_viewer(
+        camera_ids=cam_ids,
+        tile_size=args.tile,
+        draw_overlays=not args.no_overlays,
+        zmq_endpoint=args.zmq,
+    )
+
+
+def cmd_layout(args: argparse.Namespace) -> int:
+    plot_layout(
+        config=Path(args.config),
+        out_path=Path(args.out) if args.out else None,
+        show=args.show,
+        with_targets=args.with_targets,
+        target_subscription_seconds=args.target_seconds,
+        zmq_endpoint=args.zmq,
+    )
+    return 0
+
+
 def cmd_list(args: argparse.Namespace) -> int:
     try:
         import SpoutGL
@@ -161,6 +186,28 @@ def main(argv: list[str] | None = None) -> int:
                     help="Seconds to listen before exporting (static rigs ship one update).")
     cv.add_argument("--out", default="coverage.png")
     cv.set_defaults(func=cmd_coverage)
+
+    vw = sub.add_parser("view", help="Live OpenCV tile viewer for all cameras.")
+    vw.add_argument("--cameras", default=None,
+                    help="Comma-separated camera IDs. Omit to auto-discover from Spout.")
+    vw.add_argument("--tile", type=_parse_resolution, default=(480, 270),
+                    help="Per-camera tile size, format WxH (default 480x270).")
+    vw.add_argument("--no-overlays", action="store_true",
+                    help="Disable bbox/label overlays from the metadata stream.")
+    vw.add_argument("--zmq", default="tcp://127.0.0.1:5555",
+                    help="Metadata channel endpoint.")
+    vw.set_defaults(func=cmd_view)
+
+    lt = sub.add_parser("layout", help="Top-down rig layout plot from a cameras.json.")
+    lt.add_argument("--config", required=True, help="Path to a cameras.json.")
+    lt.add_argument("--out", default=None, help="Output PNG path. If omitted, only --show.")
+    lt.add_argument("--show", action="store_true", help="Open an interactive window.")
+    lt.add_argument("--with-targets", action="store_true",
+                    help="Subscribe briefly to metadata and overlay AnnotatedObject centroids.")
+    lt.add_argument("--target-seconds", type=float, default=1.0,
+                    help="How long to listen for targets when --with-targets is set.")
+    lt.add_argument("--zmq", default="tcp://127.0.0.1:5555")
+    lt.set_defaults(func=cmd_layout)
 
     gc = sub.add_parser(
         "generate-config",
